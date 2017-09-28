@@ -118,7 +118,10 @@ class robinhood_session:
         # this is the function for placing and cancelling orders
 
     '''
-    def subscriptioin_fees(self):
+    def historicals(self):
+        
+        
+    def subscription_fees(self):
         # TO CHECK
 
     def id_documents(self):
