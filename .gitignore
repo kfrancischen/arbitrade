@@ -102,3 +102,4 @@ ENV/
 
 # personalized files
 .robinhood_account
+Robinhood.log

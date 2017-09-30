@@ -13,7 +13,7 @@ print "get quotes...\n"
 print session.quotes(stock_names = 'GOOGL, GOOG'), '\n'\
 
 print "get news...\n"
-#print session.news(stock_name = 'GOOGL'), '\n'
+print session.news(stock_name = 'GOOGL'), '\n'
 
 print "get last trade price...\n"
 print session.last_trade_price(stock_names = 'GOOGL, GOOG'), '\n'
@@ -95,9 +95,9 @@ print session.securities_owned(), '\n'
 
 print "invested stocks...\n"
 print session.invested_stocks(), '\n'
-'''
+
 fit_instrument = session.instruments(stock_name = 'FIT')[0]
 
 print session.place_sell_order(instrument = fit_instrument, quantity = 1)
-'''
+
 session.logout()
