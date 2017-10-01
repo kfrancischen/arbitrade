@@ -11,7 +11,7 @@ import six, logging, getpass
 from six.moves.urllib.parse import unquote
 from six.moves.urllib.request import getproxies
 from six.moves import input
-import RH_exceptions
+from . import robinhood_exceptions
 import os.path
 from collections import defaultdict
 from datetime import datetime
@@ -77,14 +77,15 @@ class robinhood_session:
         "fundamentals": "https://api.robinhood.com/fundamentals/",
     }
 
-    logger = logging.getLogger('Robinhood')
-    hdlr = logging.FileHandler('../Robinhood.log')
+    cur_path = os.path.dirname(__file__)
+    logger = logging.getLogger('Robinhood_API')
+    hdlr = logging.FileHandler(cur_path + '/../Robinhood_API.log')
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
 
-    def __init__(self):
+    def __init__(self, write_to_log = True):
         self.session = requests.session()
         self.session.proxies = getproxies()
         self.headers = {
@@ -96,11 +97,15 @@ class robinhood_session:
             "Connection": "keep-alive",
             "User-Agent": "Robinhood/823 (iPhone; iOS 7.1.2; Scale/2.00)"
         }
+        self.is_logged_in = False
+        self.write_to_log = write_to_log
         self.session.headers = self.headers
         status = self.login_prompt()
         if status:
+            self.is_logged_in = True
             print 'successfully logged in...'
-        with open('../cache/instruments.json', 'r') as fp:
+
+        with open(self.cur_path + '/../cache/instruments.json', 'r') as fp:
             self.instruments_symbol = json.load(fp)
 
     ############################################################
@@ -160,7 +165,8 @@ class robinhood_session:
             if os.path.exists(os.path.expanduser('~') + '/.robinhood_account') == False:
                 with open(os.path.expanduser('~') + '/.robinhood_account', 'w') as f:
                     f.write( username + '\t' + password)
-            self.logger.info('successfully loggined in at ' + str(datetime.now()) + '...')
+            if self.write_to_log:
+                self.logger.info('successfully loggined in at ' + str(datetime.now()) + '...')
             return True
         return False
 
@@ -175,8 +181,13 @@ class robinhood_session:
         self.headers['Authorization'] = None
         self.auth_token = None
         print "successfully logged out..."
-        self.logger.info('successfully loggined out at ' + str(datetime.now()) + '...')
+        if self.write_to_log:
+            self.logger.info('successfully loggined out at ' + str(datetime.now()) + '...')
+        self.is_logged_in = False
         return http_result
+
+    def status(self):
+        return self.is_logged_in
 
     def account(self):
         """fetch account information
@@ -186,7 +197,8 @@ class robinhood_session:
         http_result = self.session.get(self.endpoints['accounts'])
         http_result.raise_for_status()  #auth required
         http_result = http_result.json()
-        self.logger.info('successfully getting account information...')
+        if self.write_to_log:
+            self.logger.info('successfully getting account information...')
         return http_result['results'][0]
     ############################################################
     # UPDATE DATA
@@ -195,7 +207,8 @@ class robinhood_session:
         self._quote_data(stock_names)
         self._portfolios()
         print "Updated at time: " + str(datetime.now()) + '\n'
-        self.logger.info("updated at time: " + str(datetime.now()))
+        if self.write_to_log:
+            self.logger.info("updated at time: " + str(datetime.now()))
 
     ############################################################
     # GET DATA ABOUT STOCKS FROM QUOTES
@@ -205,7 +218,8 @@ class robinhood_session:
         http_result = self.session.get(self.endpoints['investment_profile'])
         http_result.raise_for_status()
         data = http_result.json()
-        self.logger.info('successfully getting investment profile...')
+        if self.write_to_log:
+            self.logger.info('successfully getting investment profile...')
         return data
 
     def instruments(self, stock_name):
@@ -225,7 +239,8 @@ class robinhood_session:
         # if requesting all, return entire object so may paginate with ['next']
         if stock_name == "":
             return http_result
-        self.logger.info('successfully getting instruments for stocks ' + stock_name + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting instruments for stocks ' + stock_name + '...')
         return http_result['results']
 
 
@@ -270,7 +285,8 @@ class robinhood_session:
             data = http_result.json()
         except requests.exceptions.HTTPError:
             raise NameError('Invalid Symbols: ' + str(stock_names))
-        self.logger.info('successfully getting quotes for stocks ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting quotes for stocks ' + stock_names + '...')
         return data["results"]
 
     def _quote_data(self, stock_names = '', is_save = True):
@@ -303,7 +319,8 @@ class robinhood_session:
             (:obj:`dict`) values returned from `news` endpoint
         """
         http_result = self.session.get(self.endpoints['news'] + stock_name.upper() + "/").json()
-        self.logger.info('successfully getting news for stock ' + stock_name + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting news for stock ' + stock_name + '...')
 
         return http_result['results']
 
@@ -352,7 +369,8 @@ class robinhood_session:
             if item[1] != 'None':
                 result[item[0]] = float(item[1])
 
-        self.logger.info('successfully getting last_trade_price for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting last_trade_price for stock ' + stock_names + '...')
         return result
 
     def ask_price(self, stock_names = ''):
@@ -370,7 +388,8 @@ class robinhood_session:
             if item[1] != 'None':
                 result[item[0]] = float(item[1])
 
-        self.logger.info('successfully getting ask_price for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting ask_price for stock ' + stock_names + '...')
         return result
 
     def ask_size(self, stock_names = ''):
@@ -388,7 +407,8 @@ class robinhood_session:
             if item[1] != 'None':
                 result[item[0]] = int(item[1])
 
-        self.logger.info('successfully getting ask_size for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting ask_size for stock ' + stock_names + '...')
         return result
 
     def bid_price(self, stock_names = ''):
@@ -406,7 +426,8 @@ class robinhood_session:
             if item[1] != 'None':
                 result[item[0]] = float(item[1])
 
-        self.logger.info('successfully getting bid_price for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting bid_price for stock ' + stock_names + '...')
         return result
 
     def bid_size(self, stock_names = ''):
@@ -424,7 +445,8 @@ class robinhood_session:
             if item[1] != 'None':
                 result[item[0]] = int(item[1])
 
-        self.logger.info('successfully getting bid_size for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting bid_size for stock ' + stock_names + '...')
         return result
 
     def previous_close_price(self, stock_names = ''):
@@ -442,7 +464,8 @@ class robinhood_session:
             if item[1] != 'None':
                 result[item[0]] = float(item[1])
 
-        self.logger.info('successfully getting previous_close_price for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting previous_close_price for stock ' + stock_names + '...')
         return result
 
     def adjusted_previous_close_price(self, stock_names = ''):
@@ -460,7 +483,8 @@ class robinhood_session:
             if item[1] != 'None':
                 result[item[0]] = float(item[1])
 
-        self.logger.info('successfully getting adjusted_previous_close_price for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting adjusted_previous_close_price for stock ' + stock_names + '...')
         return result
 
     def updated_time(self, stock_names = ''):
@@ -478,7 +502,8 @@ class robinhood_session:
             if item[1] != 'None':
                 result[item[0]] = str(item[1])
 
-        self.logger.info('successfully getting updated_time for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting updated_time for stock ' + stock_names + '...')
         return result
 
     def last_extended_hours_trade_price(self, stock_names = ''):
@@ -496,7 +521,8 @@ class robinhood_session:
             if item[1] != 'None':
                 result[item[0]] = float(item[1])
 
-        self.logger.info('successfully getting last_extended_hours_trade_price for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting last_extended_hours_trade_price for stock ' + stock_names + '...')
         return result
 
 
@@ -556,7 +582,8 @@ class robinhood_session:
 
             final_result[stock_name] = reformat_data
 
-        self.logger.info('successfully getting historicals for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting historicals for stock ' + stock_names + '...')
         return final_result
 
     ############################################################
@@ -591,7 +618,8 @@ class robinhood_session:
         for i in range(len(stocks)):
             final_result[stocks[i]] = result[i]
 
-        self.logger.info('successfully getting fundamentals for stock ' + stock_names + '...')
+        if self.write_to_log:
+            self.logger.info('successfully getting fundamentals for stock ' + stock_names + '...')
         return final_result
 
     ############################################################
@@ -607,35 +635,40 @@ class robinhood_session:
         """wrapper for portfolios
         get `adjusted_equity_previous_close` value
         """
-        self.logger.info('successfully getting adjusted_equity_previous_close...')
+        if self.write_to_log:
+            self.logger.info('successfully getting adjusted_equity_previous_close...')
         return float(self.portfolio['adjusted_equity_previous_close'])
 
     def equity_previous_close(self):
         """wrapper for portfolios
         get `equity_previous_close` value
         """
-        self.logger.info('successfully getting equity_previous_close...')
+        if self.write_to_log:
+            self.logger.info('successfully getting equity_previous_close...')
         return float(self.portfolio['equity_previous_close'])
 
     def withdrawable_amount(self):
         """wrapper for portfolios
         get `withdrawable_amount` value
         """
-        self.logger.info('successfully getting withdrawable_amount...')
+        if self.write_to_log:
+            self.logger.info('successfully getting withdrawable_amount...')
         return float(self.portfolio['withdrawable_amount'])
 
     def equity(self):
         """wrapper for portfolios
         get `equity` value
         """
-        self.logger.info('successfully getting equity...')
+        if self.write_to_log:
+            self.logger.info('successfully getting equity...')
         return float(self.portfolio['equity'])
 
     def last_core_equity(self):
         """wrapper for portfolios
         get `last_core_equity` value
         """
-        self.logger.info('successfully getting last_core_equity...')
+        if self.write_to_log:
+            self.logger.info('successfully getting last_core_equity...')
         return float(self.portfolio['last_core_equity'])
 
 
@@ -643,7 +676,8 @@ class robinhood_session:
         """wrapper for portfolios
         get `excess_margin` value
         """
-        self.logger.info('successfully getting excess_margin...')
+        if self.write_to_log:
+            self.logger.info('successfully getting excess_margin...')
         return float(self.portfolio['excess_margin'])
 
     def extended_hours_equity(self):
@@ -651,7 +685,8 @@ class robinhood_session:
         get `extended_hours_equity` value
         """
         try:
-            self.logger.info('successfully getting extended_hours_equity...')
+            if self.write_to_log:
+                self.logger.info('successfully getting extended_hours_equity...')
             return float(self.portfolio['extended_hours_equity'])
         except TypeError:
             return None
@@ -660,7 +695,8 @@ class robinhood_session:
         """wrapper for portfolios
         get `market_value` value
         """
-        self.logger.info('successfully getting market_value...')
+        if self.write_to_log:
+            self.logger.info('successfully getting market_value...')
         return float(self.portfolio['market_value'])
 
     def extended_hours_market_value(self):
@@ -668,7 +704,8 @@ class robinhood_session:
         get `extended_hours_market_value` value
         """
         try:
-            self.logger.info('successfully getting extended_hours_market_value...')
+            if self.write_to_log:
+                self.logger.info('successfully getting extended_hours_market_value...')
             return float(self.portfolio['extended_hours_market_value'])
         except TypeError:
             return None
@@ -677,7 +714,8 @@ class robinhood_session:
         """wrapper for portfolios
         get `last_core_market_value` value
         """
-        self.logger.info('successfully getting last_core_market_value...')
+        if self.write_to_log:
+            self.logger.info('successfully getting last_core_market_value...')
         return float(self.portfolio['last_core_market_value'])
 
     def order_history(self):
@@ -689,7 +727,9 @@ class robinhood_session:
         while http_result['next'] != None:
             http_result = self.session.get(http_result['next']).json()
             result += http_result['results']
-        self.logger.info('successfully getting order_history...')
+
+        if self.write_to_log:
+            self.logger.info('successfully getting order_history...')
         return result
 
     def dividends(self):
@@ -702,7 +742,8 @@ class robinhood_session:
             http_result = self.session.get(http_result['next']).json()
             result += http_result['results']
 
-        self.logger.info('successfully getting dividends...')
+        if self.write_to_log:
+            self.logger.info('successfully getting dividends...')
         return result
 
     ############################################################
@@ -716,7 +757,8 @@ class robinhood_session:
             http_result = self.session.get(http_result['next']).json()
             result += http_result['results']
 
-        self.logger.info('successfully getting positions...')
+        if self.write_to_log:
+            self.logger.info('successfully getting positions...')
         return result
 
     def securities_owned(self):
@@ -730,7 +772,8 @@ class robinhood_session:
             http_result = self.session.get(http_result['next']).json()
             result += http_result['results']
 
-        self.logger.info('successfully getting securities_owned...')
+        if self.write_to_log:
+            self.logger.info('successfully getting securities_owned...')
         return result
 
 
@@ -796,7 +839,8 @@ class robinhood_session:
         http_result, err = p.communicate()
         if len(http_result) < 1:
             print 'Error connecting to server:', err
-            self.logger.error(err + '...')
+            if self.write_to_log:
+                self.logger.error(err + '...')
             return None
         else:
             print 'Connection successful.'
@@ -838,7 +882,8 @@ class robinhood_session:
                 'created at ' + result['created_at'] + '\t' + \
                 'fees: ' + result['fees']
             print info_str
-            self.logger.info(info_str + '...')
+            if self.write_to_log:
+                self.logger.info(info_str + '...')
 
         return result
 
@@ -862,7 +907,8 @@ class robinhood_session:
         """
         owned_stocks = self.invested_stocks()
         if instrument['symbol'] not in owned_stocks or quantity > owned_stocks[instrument['symbol']]['quantity']:
-            self.logger.error("selling " + str(quantity) + ' ' + instrument['symbol'] + ' failed...')
+            if self.write_to_log:
+                self.logger.error("selling " + str(quantity) + ' ' + instrument['symbol'] + ' failed...')
             print "selling " + str(quantity) + ' ' + instrument['symbol'] + ' failed...'
             return None
 
@@ -884,7 +930,8 @@ class robinhood_session:
                 'created at ' + result['created_at'] + '\t' + \
                 'fees: ' + result['fees']
             print info_str
-            self.logger.info(info_str + '...')
+            if self.write_to_log:
+                self.logger.info(info_str + '...')
         return result
 
     def cancel_order(self, order):
@@ -894,12 +941,14 @@ class robinhood_session:
         http_result, err = p.communicate()
         if len(http_result) < 1:
             print 'Error connecting to server:', err
-            self.logger.error(err + '...')
+            if self.write_to_log:
+                self.logger.error(err + '...')
             return None
         else:
             print 'Connection successful.'
         http_result = json.loads(http_result)
-        self.logger.info('successfully canceling order ' + order['cancel'] + '...')
+        if self.write_to_log:
+            self.logger.info('successfully canceling order ' + order['cancel'] + '...')
 
         return http_result
 

@@ -1,0 +1,1 @@
+this folder contains all the trading data from the crawler

@@ -1,6 +1,6 @@
-from robinhood_api import *
+from util import robinhood_api
 
-session = robinhood_session()
+session = robinhood_api.robinhood_session()
 session.update(stock_names = 'GOOGL, GOOG')
 
 print "get investment_profile...\n"
