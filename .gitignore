@@ -101,5 +101,4 @@ ENV/
 .mypy_cache/
 
 # personalized files
-.robinhood_account
-Robinhood.log
+trading_data/*
