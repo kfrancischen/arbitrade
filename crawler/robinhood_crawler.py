@@ -20,13 +20,10 @@ class robinhood_crawler:
     logger.setLevel(logging.INFO)
 
     def __init__(self, session, stock_names):
-        if session.status() == False:
-            self.logger.info('session not logged in...')
-            print 'session not logged in...'
-            sys.exit()
-
         self.session = session
         self.stock_names = stock_names.replace(' ', '')
+        self.today_date = str(datetime.now(timezone('US/Eastern')).date())
+        self.logger.info('Crawling for date ' + self.today_date)
 
     def _check_time(self):
         """check whether it is trading today"""
@@ -39,8 +36,11 @@ class robinhood_crawler:
         After-Hours continues for 120 minutes (2 hours) until 6:00PM EST
         '''
         today = datetime.now(timezone('US/Eastern'))
-        today_date = today.date().weekday()
+        if str(today.date()) != self.today_date:
+            self.today_date = str(today.date())
+            self.logger.info('Crawling for date ' + self.today_date)
 
+        today_date = today.date().weekday()
         trading_start_time = today.replace(hour = 9, minute = 0, second = 0, microsecond = 0)
         trading_end_time = today.replace(hour = 18, minute = 0, second = 0, microsecond = 0)
 
@@ -60,9 +60,7 @@ class robinhood_crawler:
         while True:
             time.sleep(interval)
             if self._check_time() == False:
-                self.logger.info('check time: False...')
                 continue
-            self.logger.info('check time: correct. Writing to disk...')
             self._crawl_every()
 
 
@@ -93,5 +91,4 @@ class robinhood_crawler:
                 for key in headers:
                     row.append(quote[key])
                 writer.writerow(row)
-            self.logger.info('writing ' + stock_name + ' finished...')
 

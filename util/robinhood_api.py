@@ -6,7 +6,7 @@ https://api.robinhood.com/
 some codes are adopted from https://github.com/Jamonek/Robinhood/blob/master/Robinhood/Robinhood.py
 '''
 from enum import Enum
-import requests
+import requests, warnings
 import six, logging, getpass
 from six.moves.urllib.parse import unquote
 from six.moves.urllib.request import getproxies
@@ -85,7 +85,7 @@ class robinhood_session:
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
 
-    def __init__(self, write_to_log = True):
+    def __init__(self, require_log_in = True, write_to_log = True):
         self.session = requests.session()
         self.session.proxies = getproxies()
         self.headers = {
@@ -100,10 +100,12 @@ class robinhood_session:
         self.is_logged_in = False
         self.write_to_log = write_to_log
         self.session.headers = self.headers
-        status = self.login_prompt()
-        if status:
-            self.is_logged_in = True
-            print 'successfully logged in...'
+        self.require_log_in = require_log_in
+        if self.require_log_in:
+            status = self.login_prompt()
+            if status:
+                self.is_logged_in = True
+                print 'successfully logged in...'
 
         with open(self.cur_path + '/../cache/instruments.json', 'r') as fp:
             self.instruments_symbol = json.load(fp)
@@ -172,6 +174,8 @@ class robinhood_session:
 
     def logout(self):
         """function to login"""
+        if self.require_log_in == False:
+            return
         try:
             http_result = self.session.post(self.endpoints['logout'])
             http_result.raise_for_status()
