@@ -25,6 +25,7 @@ class robinhood_crawler:
         self.today_date = self.yesterday_date = str(datetime.now(timezone('US/Eastern')).date())
         self.logger.info('Crawling for date ' + self.today_date)
         self.is_crawling = False
+        self.visited_hours = {}
 
     def status():
         return self.is_crawling
@@ -43,6 +44,7 @@ class robinhood_crawler:
         if str(today.date()) != self.today_date:
             self.today_date = str(today.date())
             self.logger.info('Crawling real time data for date ' + self.today_date)
+            self.visited_hours = {}
 
         today_date = today.date().weekday()
         trading_start_time = today.replace(hour = 9, minute = 0, second = 0, microsecond = 0)
@@ -65,7 +67,6 @@ class robinhood_crawler:
         self.logger.info('start crawling for ' + self.stock_names + '...')
         while True:
             time.sleep(interval)
-            ''
             # craw for historical
             if self.today_date != self.yesterday_date:
                 self._craw_historical()
@@ -79,8 +80,9 @@ class robinhood_crawler:
             self._crawl_real_time()
 
             # craw for news for every two hours
-            if (cur_hour - 9) % 2 == 0:
-                self.logger.info('Crawling news for hour ' + cur_hour)
+            if (cur_hour - 9) % 2 == 0 and cur_hour not in self.visited_hours:
+                self.visited_hours[cur_hour] = True
+                self.logger.info('Crawling news for hour ' + str(cur_hour))
                 self._crawl_news()
 
     def _craw_historical(self, interval = '5minute', span = 'day', bounds = 'extended'):
