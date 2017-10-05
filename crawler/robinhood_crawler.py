@@ -22,8 +22,12 @@ class robinhood_crawler:
     def __init__(self, session, stock_names):
         self.session = session
         self.stock_names = stock_names.replace(' ', '')
-        self.today_date = str(datetime.now(timezone('US/Eastern')).date())
+        self.today_date = self.yesterday_date = str(datetime.now(timezone('US/Eastern')).date())
         self.logger.info('Crawling for date ' + self.today_date)
+        self.is_crawling = False
+
+    def status():
+        return self.is_crawling
 
     def _check_time(self):
         """check whether it is trading today"""
@@ -38,7 +42,7 @@ class robinhood_crawler:
         today = datetime.now(timezone('US/Eastern'))
         if str(today.date()) != self.today_date:
             self.today_date = str(today.date())
-            self.logger.info('Crawling for date ' + self.today_date)
+            self.logger.info('Crawling real time data for date ' + self.today_date)
 
         today_date = today.date().weekday()
         trading_start_time = today.replace(hour = 9, minute = 0, second = 0, microsecond = 0)
@@ -46,9 +50,11 @@ class robinhood_crawler:
 
         # does not trade on Saturday and Sunday between the above hours
         if today_date >= 5 or today < trading_start_time or today > trading_end_time:
-            return False
+            self.is_crawling = False
+            return False, today.hour
+        self.is_crawling = True
 
-        return True
+        return True, today.hour
 
 
     def crawl(self, interval = 5):
@@ -59,12 +65,91 @@ class robinhood_crawler:
         self.logger.info('start crawling for ' + self.stock_names + '...')
         while True:
             time.sleep(interval)
-            if self._check_time() == False:
+            ''
+            # craw for historical
+            if self.today_date != self.yesterday_date:
+                self._craw_historical()
+                self.logger.info('Crawling historical data for date ' + self.yesterday_date)
+                self.yesterday_date = self.today_date
+
+            # craw for real time data
+            to_craw, cur_hour = self._check_time()
+            if to_craw == False:
                 continue
-            self._crawl_every()
+            self._crawl_real_time()
+
+            # craw for news for every two hours
+            if (cur_hour - 9) % 2 == 0:
+                self.logger.info('Crawling news for hour ' + cur_hour)
+                self._crawl_news()
+
+    def _craw_historical(self, interval = '5minute', span = 'day', bounds = 'extended'):
+        historicals = self.session.historicals(
+                stock_names = self.stock_names,
+                interval = interval,
+                span = span,
+                bounds = bounds)
+        stocks = self.stock_names.split(',')
+        headers = historicals[stocks[0]].keys()
+
+        data_path = self.cur_path + '/../trading_data/' + str(self.yesterday_date)
+        for i in range(len(stocks)):
+            stock_name = stocks[i]
+            historical = historicals[stock_name]
+            file_path = data_path + '/' + stock_name + '_' + interval + '_' + span + '_' + bounds + '.csv'
+            if os.path.exists(file_path) == False:
+                with open(file_path, 'w') as outcsv:
+                    writer = csv.DictWriter(outcsv, fieldnames = headers)
+                    writer.writeheader()
+
+            with open(file_path, 'a') as outcsv:
+                writer = csv.writer(outcsv)
+                row = []
+                data_len = len(historical[headers[0]])
+                for i in range(data_len):
+                    row = []
+                    for key in headers:
+                        row.append(historical[key][i])
+                    writer.writerow(row)
+
+    def _crawl_news(self):
+        today_date = datetime.now(timezone('US/Eastern')).date()
+
+        data_path = self.cur_path + '/../trading_data/' + str(today_date)
+        if os.path.exists(data_path) == False:
+            os.mkdir(data_path)
+
+        stocks = self.stock_names.split(',')
+        news_list = []
+        for i in range(len(stocks)):
+            news_list.append(self.session.news(stock_name = stocks[i]))
+
+        headers = news_list[0][0].keys()
+        for i in range(len(stocks)):
+            stock_name = stocks[i]
+            news = news_list[i]
+
+            file_path = data_path + '/' + stock_name + '_news.csv'
+            if os.path.exists(file_path) == False:
+                with open(file_path, 'w') as outcsv:
+                    writer = csv.DictWriter(outcsv, fieldnames = headers)
+                    writer.writeheader()
+
+            with open(file_path, 'a') as outcsv:
+                writer = csv.writer(outcsv)
+                for item in news:
+                    row = []
+                    for key in headers:
+                        val = item[key]
+                        if key == 'summary' or key == 'title':
+                            val = val.encode('ascii', 'ignore')
+                        row.append(val)
+                    writer.writerow(row)
+
+        return
 
 
-    def _crawl_every(self):
+    def _crawl_real_time(self):
         """
         crawling data for every interval
         """

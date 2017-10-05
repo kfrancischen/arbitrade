@@ -107,6 +107,9 @@ class robinhood_session:
                 self.is_logged_in = True
                 print 'successfully logged in...'
 
+        if os.path.exists(self.cur_path + '/../cache/instruments.json') == False:
+            self._instrument_symbol()
+
         with open(self.cur_path + '/../cache/instruments.json', 'r') as fp:
             self.instruments_symbol = json.load(fp)
 
@@ -268,7 +271,7 @@ class robinhood_session:
             for item in http_result['results']:
                 instrument_symbol[item['url']] = item['symbol']
 
-        with open('instruments.json', 'w') as fp:
+        with open(self.cur_path + '/../cache/instruments.json', 'w') as fp:
             json.dump(instrument_symbol, fp)
 
         print len(instrument_symbol), ' successful'
@@ -562,18 +565,20 @@ class robinhood_session:
         try:
             http_result = requests.get(url)
             http_result.raise_for_status()
-            data = http_result.json()
+            http_result = http_result.json()
         except requests.exceptions.HTTPError:
             raise NameError('Invalid Symbols: ' + str(stock_names))
 
+        historical_data = []
         if isSingle:
-            return {stock_names:data['historicals']}
+            historical_data = [http_result]
+        else:
+            historical_data = http_result['results']
 
         result = {}
-        data = data["results"]
         stocks = stock_names.split(',')
         for i in range(len(stocks)):
-            result[stocks[i]] = data[i]['historicals']
+            result[stocks[i]] = historical_data[i]['historicals']
 
         final_result = {}
 
