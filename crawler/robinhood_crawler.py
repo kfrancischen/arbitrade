@@ -67,16 +67,16 @@ class robinhood_crawler:
         self.logger.info('start crawling for ' + self.stock_names + '...')
         while True:
             time.sleep(interval)
+            # craw for real time data
+            to_craw, cur_hour = self._check_time()
+            if to_craw == False:
+                continue
             # craw for historical
             if self.today_date != self.yesterday_date:
                 self._craw_historical()
                 self.logger.info('Crawling historical data for date ' + self.yesterday_date)
                 self.yesterday_date = self.today_date
 
-            # craw for real time data
-            to_craw, cur_hour = self._check_time()
-            if to_craw == False:
-                continue
             self._crawl_real_time()
 
             # craw for news for every two hours
